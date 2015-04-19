@@ -8,6 +8,7 @@
 
 #import "DetailViewController.h"
 #import <ObjectiveGit/ObjectiveGit.h>
+#import <git2/common.h>
 
 @interface DetailViewController ()
 @property (strong, nonatomic) UIPopoverController *masterPopoverController;
@@ -36,6 +37,18 @@
 {
     // Update the user interface for the detail item.
 
+    NSString *const CACertificateFile_DigiCert = @"DigiCertHighAssuranceEVRootCA.pem";
+    NSString *const certFilePath = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:CACertificateFile_DigiCert];
+    NSLog(@"Loading certificate: %@", certFilePath);
+    
+    const char *file = certFilePath.UTF8String;
+    const char *path = NULL;
+    
+    int returnValue = git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, file, path);
+    if (returnValue != 0) {
+        NSLog(@"Error setting SSL certificate location");
+    }
+    
 	if (self.detailItem) {
 		GTRepository* repo = nil;
 		NSString* url = [self.detailItem valueForKey:@"gitURL"];
@@ -44,27 +57,49 @@
 		NSURL* appDocsDir = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
 		NSURL* localURL = [NSURL URLWithString:url.lastPathComponent relativeToURL:appDocsDir];
 		
-		if (![fileManager fileExistsAtPath:localURL.path isDirectory:nil]) {
-			repo = [GTRepository cloneFromURL:[NSURL URLWithString:url] toWorkingDirectory:localURL options:@{GTRepositoryCloneOptionsTransportFlags: @YES} error:&error transferProgressBlock:^(const git_transfer_progress *progress) {
-				//
-			} checkoutProgressBlock:^(NSString *path, NSUInteger completedSteps, NSUInteger totalSteps) {
-				NSLog(@"%d/%d", completedSteps, totalSteps);
+        NSURL*nsUrl = [NSURL URLWithString:url];
+        if (![fileManager fileExistsAtPath:localURL.path isDirectory:nil]) {
+//            repo = [GTRepository
+//                    cloneFromURL:nsUrl
+//                    toWorkingDirectory: localURL
+//                    options: @{GTRepositoryCloneOptionsTransportFlags: @YES}
+//                    error: &error
+//                    transferProgressBlock: ^(const git_transfer_progress * progress, BOOL *stop) {
+//                    }
+//                    checkoutProgressBlock:^(NSString *path, NSUInteger completedSteps, NSUInteger totalSteps) {
+//                        NSLog(@"%lu/%lu", (unsigned long)completedSteps, (unsigned long)totalSteps);
+//                    }
+//                ];
+			repo =
+                [GTRepository
+                    cloneFromURL:[NSURL URLWithString:url]
+                    toWorkingDirectory:localURL
+                    options:@{GTRepositoryCloneOptionsTransportFlags: @YES}
+                    error:&error
+                 transferProgressBlock:^(const git_transfer_progress *progress, BOOL *stop) {
+				
+                                                  }
+            checkoutProgressBlock:^(NSString *path, NSUInteger completedSteps, NSUInteger totalSteps) {
+				NSLog(@"%lu/%lu", (unsigned long)completedSteps, (unsigned long)totalSteps);
 			}];
 			if (error) {
 				NSLog(@"%@", error);
 			}
-		} else {
+		}
+        else {
 			repo = [GTRepository repositoryWithURL:localURL error:&error];
 			if (error) {
 				NSLog(@"%@", error);
 			}
-			
+
 		}
 		GTReference* head = [repo headReferenceWithError:&error];
 		if (error) {
 			NSLog(@"%@", error.localizedDescription);
 		}
-		GTCommit* commit = [repo lookupObjectBySHA:head.targetSHA error:&error];
+        
+        GTCommit* commit = [repo lookUpObjectByOID: head.targetOID  error:&error];
+//		GTCommit* commit = [repo lookupObjectBySHA: head.targetSHA error:&error];
 		if (error) {
 			NSLog(@"%@", error.localizedDescription);
 		}
