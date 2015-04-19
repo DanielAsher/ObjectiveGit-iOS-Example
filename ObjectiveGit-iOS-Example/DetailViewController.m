@@ -87,10 +87,49 @@
 			}
 		}
         else {
-			repo = [GTRepository repositoryWithURL:localURL error:&error];
-			if (error) {
-				NSLog(@"%@", error);
-			}
+
+            // Get the local branch
+            GTBranch *localBranch = [repo localBranchesWithError:nil][0];
+            // Get the remote branch
+            GTBranch *remoteBranch = [repo remoteBranchesWithError:nil][0];
+            
+            GTCommit *localCommit = [localBranch targetCommitAndReturnError:nil];
+            GTCommit *remoteCommit = [remoteBranch targetCommitAndReturnError:nil];
+
+            if (localCommit.message != remoteCommit.message) {
+                
+                // Get the local & remote commit
+                
+                // Get the trees of both
+                GTTree *localTree = localCommit.tree;
+                GTTree *remoteTree = remoteCommit.tree;
+                
+                // Get OIDs of both commits too
+                GTOID *localOID = localCommit.OID;
+                GTOID *remoteOID = remoteCommit.OID;
+                
+                // Find a merge base to act as the ancestor between these two commits
+                GTCommit *ancestor = [repo mergeBaseBetweenFirstOID:localOID secondOID:remoteOID error:&error];
+                if (error) {
+                    NSLog(@"Error finding merge base: %@", error);
+                }
+                // Get the ancestors tree
+                GTTree *ancestorTree = ancestor.tree;
+                
+                // Merge into the local tree
+                GTIndex *mergedIndex = [localTree merge:remoteTree ancestor:ancestorTree error:&error];
+                if (error) {
+                    NSLog(@"Error mergeing: %@", error);
+                }
+                // Write the merge to disk and store the new tree
+                GTTree *newTree = [mergedIndex writeTreeToRepository:repo error:&error];
+                if (error) {
+                    NSLog(@"Error writing merge index to disk: %@", error);
+                }			repo = [GTRepository repositoryWithURL:localURL error:&error];
+                if (error) {
+                    NSLog(@"%@", error);
+                }
+            }
 
 		}
 		GTReference* head = [repo headReferenceWithError:&error];
@@ -99,7 +138,6 @@
 		}
         
         GTCommit* commit = [repo lookUpObjectByOID: head.targetOID  error:&error];
-//		GTCommit* commit = [repo lookupObjectBySHA: head.targetSHA error:&error];
 		if (error) {
 			NSLog(@"%@", error.localizedDescription);
 		}
